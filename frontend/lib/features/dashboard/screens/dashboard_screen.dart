@@ -201,7 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         ...dashboard.recentSales.map((sale) {
                           final saleDate = sale['saleDate'] != null
-                              ? DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(sale['saleDate']))
+                              ? DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse('${sale['saleDate']}Z').toLocal())
                               : 'N/A';
                           final amount = (sale['totalAmount'] as num?)?.toDouble() ?? 0.0;
 

@@ -61,6 +61,16 @@ class SaleProvider extends ChangeNotifier {
     }
   }
 
+  Future<StockInfo?> fetchMedicineDetailedStock(int medicineId) async {
+    try {
+      final response = await _apiClient.dio.get('/stock/medicine/$medicineId');
+      return StockInfo.fromJson(response.data);
+    } catch (e) {
+      debugPrint('Error fetching detailed stock for medicine $medicineId: $e');
+      return null;
+    }
+  }
+
   Future<void> fetchAvailableStockAndMedicines() async {
     try {
       final stockResp = await _apiClient.dio.get('/stock');

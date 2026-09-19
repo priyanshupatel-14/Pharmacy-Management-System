@@ -37,7 +37,16 @@ class _SignupScreenState extends State<SignupScreen> {
         _passwordController.text,
       );
 
-      if (!success && mounted) {
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Pharmacy registered successfully! Please log in.'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      } else if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authProvider.errorMessage ?? 'Signup failed'),

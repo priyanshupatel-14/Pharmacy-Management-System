@@ -54,7 +54,7 @@ class _SalesScreenState extends State<SalesScreen> {
                     children: [
                       const Text('Date & Time', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       Text(
-                        DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(detailedSale.saleDate)),
+                        DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse('${detailedSale.saleDate}Z').toLocal()),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -182,7 +182,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                   return DataRow(
                                     cells: [
                                       DataCell(Text('#${sale.id}', style: const TextStyle(fontWeight: FontWeight.w600))),
-                                      DataCell(Text(DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(sale.saleDate)))),
+                                      DataCell(Text(DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse('${sale.saleDate}Z').toLocal()))),
                                       DataCell(
                                         Container(
                                           alignment: Alignment.centerLeft,

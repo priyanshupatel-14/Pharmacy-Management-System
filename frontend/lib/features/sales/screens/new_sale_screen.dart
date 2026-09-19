@@ -36,9 +36,11 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   
   StockInfo? _selectedStock;
   MedicineBatch? _selectedBatch;
+  List<MedicineBatch> _availableBatches = [];
   final TextEditingController _qtyController = TextEditingController();
 
   bool _isSubmitting = false;
+  bool _isFetchingBatches = false;
 
   @override
   void initState() {
@@ -203,28 +205,46 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                         items: provider.availableStock.where((s) => s.totalStock > 0).map((s) {
                           return DropdownMenuItem(value: s, child: Text(s.medicineName));
                         }).toList(),
-                        onChanged: (val) {
+                        onChanged: (val) async {
+                          if (val == null) return;
                           setState(() {
                             _selectedStock = val;
                             _selectedBatch = null;
+                            _availableBatches = [];
+                            _isFetchingBatches = true;
                           });
+                          
+                          final detailedStock = await context.read<SaleProvider>().fetchMedicineDetailedStock(val.medicineId);
+                          
+                          if (mounted) {
+                            setState(() {
+                              _availableBatches = detailedStock?.batches ?? [];
+                              _isFetchingBatches = false;
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 20),
-                      DropdownButtonFormField<MedicineBatch>(
-                        decoration: const InputDecoration(labelText: 'Batch'),
-                        initialValue: _selectedBatch,
-                        isExpanded: true,
-                        items: _selectedStock?.batches.where((b) => b.quantity > 0).map((b) {
-                          final label = '${b.batchNumber} (Stock: ${b.quantity})${b.isExpired ? ' - EXPIRED' : ''}';
-                          return DropdownMenuItem(value: b, child: Text(label));
-                        }).toList() ?? [],
-                        onChanged: _selectedStock == null ? null : (val) {
-                          setState(() {
-                            _selectedBatch = val;
-                          });
-                        },
-                      ),
+                      if (_isFetchingBatches)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else
+                        DropdownButtonFormField<MedicineBatch>(
+                          decoration: const InputDecoration(labelText: 'Batch'),
+                          initialValue: _selectedBatch,
+                          isExpanded: true,
+                          items: _availableBatches.where((b) => b.quantity > 0).map((b) {
+                            final label = '${b.batchNumber} (Stock: ${b.quantity})${b.isExpired ? ' - EXPIRED' : ''}';
+                            return DropdownMenuItem(value: b, child: Text(label));
+                          }).toList(),
+                          onChanged: _selectedStock == null ? null : (val) {
+                            setState(() {
+                              _selectedBatch = val;
+                            });
+                          },
+                        ),
                       const SizedBox(height: 20),
                       TextFormField(
                         controller: _qtyController,

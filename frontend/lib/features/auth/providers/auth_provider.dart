@@ -114,26 +114,8 @@ class AuthProvider extends ChangeNotifier {
         'password': password,
       });
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final token = data['token'];
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
-        await prefs.setInt('userId', data['id']);
-        await prefs.setString('username', data['username']);
-        await prefs.setString('role', data['role']);
-        await prefs.setString('fullName', data['fullName']);
-        if (data['pharmacyName'] != null) {
-          await prefs.setString('pharmacyName', data['pharmacyName']);
-        }
-
-        _isAuthenticated = true;
-        _userId = data['id'];
-        _username = data['username'];
-        _role = data['role'];
-        _fullName = data['fullName'];
-        _pharmacyName = data['pharmacyName'];
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Do NOT automatically log in. Just return success.
         _isLoading = false;
         notifyListeners();
         return true;
