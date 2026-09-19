@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
+import com.pharmacy.common.auth.TenantContext;
 
 /**
  * Data Access Object for suppliers table using JdbcTemplate.
@@ -39,26 +40,27 @@ public class SupplierDao {
     }
 
     public List<Supplier> findAll() {
-        String sql = "SELECT * FROM suppliers ORDER BY name";
-        return jdbcTemplate.query(sql, rowMapper);
+        String sql = "SELECT * FROM suppliers WHERE pharmacy_id = ? ORDER BY name";
+        return jdbcTemplate.query(sql, rowMapper, TenantContext.getCurrentPharmacyId());
     }
 
     public Optional<Supplier> findById(Long id) {
-        String sql = "SELECT * FROM suppliers WHERE id = ?";
-        List<Supplier> results = jdbcTemplate.query(sql, rowMapper, id);
+        String sql = "SELECT * FROM suppliers WHERE id = ? AND pharmacy_id = ?";
+        List<Supplier> results = jdbcTemplate.query(sql, rowMapper, id, TenantContext.getCurrentPharmacyId());
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
     public Supplier save(Supplier supplier) {
-        String sql = "INSERT INTO suppliers (name, phone, email, address) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO suppliers (pharmacy_id, name, phone, email, address) VALUES (?, ?, ?, ?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, supplier.getName());
-            ps.setString(2, supplier.getPhone());
-            ps.setString(3, supplier.getEmail());
-            ps.setString(4, supplier.getAddress());
+            ps.setLong(1, TenantContext.getCurrentPharmacyId());
+            ps.setString(2, supplier.getName());
+            ps.setString(3, supplier.getPhone());
+            ps.setString(4, supplier.getEmail());
+            ps.setString(5, supplier.getAddress());
             return ps;
         }, keyHolder);
 
@@ -70,17 +72,18 @@ public class SupplierDao {
     }
 
     public int update(Supplier supplier) {
-        String sql = "UPDATE suppliers SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?";
+        String sql = "UPDATE suppliers SET name = ?, phone = ?, email = ?, address = ? WHERE id = ? AND pharmacy_id = ?";
         return jdbcTemplate.update(sql,
                 supplier.getName(),
                 supplier.getPhone(),
                 supplier.getEmail(),
                 supplier.getAddress(),
-                supplier.getId());
+                supplier.getId(),
+                TenantContext.getCurrentPharmacyId());
     }
 
     public int deleteById(Long id) {
-        String sql = "DELETE FROM suppliers WHERE id = ?";
-        return jdbcTemplate.update(sql, id);
+        String sql = "DELETE FROM suppliers WHERE id = ? AND pharmacy_id = ?";
+        return jdbcTemplate.update(sql, id, TenantContext.getCurrentPharmacyId());
     }
 }

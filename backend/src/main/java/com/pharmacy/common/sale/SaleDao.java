@@ -13,6 +13,8 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.List;
 import java.util.Optional;
+import com.pharmacy.common.auth.TenantContext;
+import com.pharmacy.common.exception.ResourceNotFoundException;
 
 /**
  * Data Access Object for sales and sale_items tables using JdbcTemplate.
@@ -70,9 +72,10 @@ public class SaleDao {
                 SELECT s.*, u.full_name AS user_name
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
+                WHERE s.pharmacy_id = ?
                 ORDER BY s.sale_date DESC
                 """;
-        return jdbcTemplate.query(sql, saleRowMapper);
+        return jdbcTemplate.query(sql, saleRowMapper, TenantContext.getCurrentPharmacyId());
     }
 
     public Optional<Sale> findById(Long id) {
@@ -80,9 +83,9 @@ public class SaleDao {
                 SELECT s.*, u.full_name AS user_name
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
-                WHERE s.id = ?
+                WHERE s.id = ? AND s.pharmacy_id = ?
                 """;
-        List<Sale> results = jdbcTemplate.query(sql, saleRowMapper, id);
+        List<Sale> results = jdbcTemplate.query(sql, saleRowMapper, id, TenantContext.getCurrentPharmacyId());
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
@@ -92,24 +95,26 @@ public class SaleDao {
                 FROM sale_items si
                 JOIN medicine_batches mb ON si.batch_id = mb.id
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE si.sale_id = ?
+                JOIN sales s ON si.sale_id = s.id
+                WHERE si.sale_id = ? AND s.pharmacy_id = ?
                 ORDER BY si.id
                 """;
-        return jdbcTemplate.query(sql, itemRowMapper, saleId);
+        return jdbcTemplate.query(sql, itemRowMapper, saleId, TenantContext.getCurrentPharmacyId());
     }
 
     public Sale saveSale(Sale sale) {
-        String sql = "INSERT INTO sales (user_id, total_amount) VALUES (?, ?)";
+        String sql = "INSERT INTO sales (pharmacy_id, user_id, total_amount) VALUES (?, ?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, TenantContext.getCurrentPharmacyId());
             if (sale.getUserId() != null) {
-                ps.setLong(1, sale.getUserId());
+                ps.setLong(2, sale.getUserId());
             } else {
-                ps.setNull(1, Types.BIGINT);
+                ps.setNull(2, Types.BIGINT);
             }
-            ps.setBigDecimal(2, sale.getTotalAmount());
+            ps.setBigDecimal(3, sale.getTotalAmount());
             return ps;
         }, keyHolder);
 
@@ -121,6 +126,20 @@ public class SaleDao {
     }
 
     public void saveSaleItem(SaleItem item) {
+        // Verify sale ownership
+        String verifySaleSql = "SELECT COUNT(*) FROM sales WHERE id = ? AND pharmacy_id = ?";
+        Integer saleCount = jdbcTemplate.queryForObject(verifySaleSql, Integer.class, item.getSaleId(), TenantContext.getCurrentPharmacyId());
+        if (saleCount == null || saleCount == 0) {
+            throw new ResourceNotFoundException("Sale not found or access denied");
+        }
+
+        // Verify batch ownership
+        String verifyBatchSql = "SELECT COUNT(*) FROM medicine_batches mb JOIN medicines m ON mb.medicine_id = m.id WHERE mb.id = ? AND m.pharmacy_id = ?";
+        Integer batchCount = jdbcTemplate.queryForObject(verifyBatchSql, Integer.class, item.getBatchId(), TenantContext.getCurrentPharmacyId());
+        if (batchCount == null || batchCount == 0) {
+            throw new ResourceNotFoundException("Batch not found or access denied");
+        }
+
         String sql = "INSERT INTO sale_items (sale_id, batch_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)";
         jdbcTemplate.update(sql,
                 item.getSaleId(),
@@ -131,8 +150,8 @@ public class SaleDao {
     }
 
     public void updateTotal(Long saleId, BigDecimal total) {
-        String sql = "UPDATE sales SET total_amount = ? WHERE id = ?";
-        jdbcTemplate.update(sql, total, saleId);
+        String sql = "UPDATE sales SET total_amount = ? WHERE id = ? AND pharmacy_id = ?";
+        jdbcTemplate.update(sql, total, saleId, TenantContext.getCurrentPharmacyId());
     }
 }
 

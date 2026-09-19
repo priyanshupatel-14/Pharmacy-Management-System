@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class User {
 
     private Long id;
+    private Long pharmacyId;
     private String username;
     private String password;
     private String fullName;
@@ -25,6 +26,14 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getPharmacyId() {
+        return pharmacyId;
+    }
+
+    public void setPharmacyId(Long pharmacyId) {
+        this.pharmacyId = pharmacyId;
     }
 
     public String getUsername() {

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/widgets/page_header.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/widgets/data_table_card.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../providers/medicine_provider.dart';
 import 'medicine_form_dialog.dart';
 import '../models/medicine.dart';
@@ -46,7 +49,8 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(medicine == null ? 'Medicine added successfully' : 'Medicine updated successfully'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -62,7 +66,8 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -73,13 +78,21 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
         final success = await context.read<MedicineProvider>().deleteMedicine(medicine.id);
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Medicine deleted successfully'), backgroundColor: Colors.green),
+            SnackBar(
+              content: const Text('Medicine deleted successfully'),
+              backgroundColor: Colors.green.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }
@@ -91,119 +104,140 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
     final provider = context.watch<MedicineProvider>();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showFormDialog(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Medicine'),
-      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             PageHeader(
               title: 'Medicines',
-              subtitle: 'Manage pharmacy inventory and catalog',
-              action: IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh List',
-                onPressed: () {
-                  _searchController.clear();
-                  provider.fetchMedicines();
-                },
+              subtitle: 'Manage pharmacy catalog and pricing',
+              action: FilledButton.icon(
+                onPressed: () => _showFormDialog(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Medicine'),
               ),
             ),
-            // Search Bar
+            
+            // Toolbar
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Search medicines by name or category...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          provider.fetchMedicines();
-                        },
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or category...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  provider.fetchMedicines();
+                                  FocusScope.of(context).unfocus();
+                                },
+                              )
+                            : null,
                       ),
+                      onSubmitted: (_) => _onSearch(),
+                      onChanged: (val) => setState(() {}),
                     ),
-                    onSubmitted: (_) => _onSearch(),
                   ),
                 ),
                 const SizedBox(width: 16),
-                ElevatedButton(
+                OutlinedButton.icon(
                   onPressed: provider.isLoading ? null : _onSearch,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text('Search'),
-                  ),
+                  icon: const Icon(Icons.filter_list, size: 18),
+                  label: const Text('Filter'),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: () {
+                    _searchController.clear();
+                    provider.fetchMedicines();
+                  },
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            // Data Table / List
+            
+            // Content
             Expanded(
               child: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const LoadingState(message: 'Loading catalog...')
                   : provider.errorMessage != null
-                      ? Center(
-                          child: Text(
-                            provider.errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 16),
-                          ),
+                      ? ErrorState(
+                          message: provider.errorMessage!,
+                          onRetry: () => provider.fetchMedicines(),
                         )
                       : provider.medicines.isEmpty
-                          ? const Center(child: Text('No medicines found.'))
-                          : Card(
-                              elevation: 2,
-                              child: ListView(
-                                children: [
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: DataTable(
-                                      columns: const [
-                                        DataColumn(label: Text('ID')),
-                                        DataColumn(label: Text('Name')),
-                                        DataColumn(label: Text('Category')),
-                                        DataColumn(label: Text('Manufacturer')),
-                                        DataColumn(label: Text('Unit Price (₹)')),
-                                        DataColumn(label: Text('Supplier')),
-                                        DataColumn(label: Text('Actions')),
-                                      ],
-                                      rows: provider.medicines.map((med) {
-                                        return DataRow(cells: [
-                                          DataCell(Text(med.id.toString())),
-                                          DataCell(Text(med.name)),
-                                          DataCell(Text(med.category)),
-                                          DataCell(Text(med.manufacturer ?? '-')),
-                                          DataCell(Text(med.unitPrice.toStringAsFixed(2))),
-                                          DataCell(Text(med.supplierName ?? '-')),
-                                          DataCell(
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                                  tooltip: 'Edit',
-                                                  onPressed: () => _showFormDialog(med),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                                  tooltip: 'Delete',
-                                                  onPressed: () => _confirmDelete(med),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ]);
-                                      }).toList(),
-                                    ),
-                                  ),
+                          ? const EmptyState(
+                              title: 'No medicines found',
+                              message: 'Try adjusting your search or add a new medicine.',
+                              icon: Icons.medical_services_outlined,
+                            )
+                          : DataTableCard(
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('ID')),
+                                  DataColumn(label: Text('NAME')),
+                                  DataColumn(label: Text('CATEGORY')),
+                                  DataColumn(label: Text('MANUFACTURER')),
+                                  DataColumn(label: Text('SUPPLIER')),
+                                  DataColumn(label: Text('UNIT PRICE', textAlign: TextAlign.right)),
+                                  DataColumn(label: Text('ACTIONS', textAlign: TextAlign.right)),
                                 ],
+                                rows: provider.medicines.map((med) {
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text('#${med.id}', style: const TextStyle(color: Colors.grey))),
+                                      DataCell(Text(med.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(med.category, style: const TextStyle(fontSize: 12)),
+                                        ),
+                                      ),
+                                      DataCell(Text(med.manufacturer ?? '-')),
+                                      DataCell(Text(med.supplierName ?? '-')),
+                                      DataCell(
+                                        Container(
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            CurrencyFormatter.format(med.unitPrice),
+                                            style: const TextStyle(fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.edit_outlined, size: 18),
+                                              tooltip: 'Edit',
+                                              onPressed: () => _showFormDialog(med),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade400),
+                                              tooltip: 'Delete',
+                                              onPressed: () => _confirmDelete(med),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
                               ),
                             ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class PageHeader extends StatelessWidget {
   final String title;
@@ -18,29 +19,35 @@ class PageHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
+                  title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: AppTheme.textPrimary,
                       ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-          ?action,
+          if (action != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0),
+              child: action!,
+            ),
         ],
       ),
     );

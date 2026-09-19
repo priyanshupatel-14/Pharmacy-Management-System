@@ -11,16 +11,18 @@ public class LoginResponse {
     private String fullName;
     private String role;
     private String token;
+    private String pharmacyName;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(Long id, String username, String fullName, String role, String token) {
+    public LoginResponse(Long id, String username, String fullName, String role, String token, String pharmacyName) {
         this.id = id;
         this.username = username;
         this.fullName = fullName;
         this.role = role;
         this.token = token;
+        this.pharmacyName = pharmacyName;
     }
 
     // Getters and setters
@@ -63,5 +65,13 @@ public class LoginResponse {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public String getPharmacyName() {
+        return pharmacyName;
+    }
+
+    public void setPharmacyName(String pharmacyName) {
+        this.pharmacyName = pharmacyName;
     }
 }

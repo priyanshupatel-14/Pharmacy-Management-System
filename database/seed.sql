@@ -1,42 +1,48 @@
 -- ============================================================
--- Pharmacy Management System — Seed Data
+-- Pharmacy Management System — Seed Data (Multi-Tenant)
 -- Run AFTER schema.sql
 -- ============================================================
 
 -- ============================================================
--- USERS (passwords are BCrypt hashes of the plaintext shown in comments)
+-- 1. PHARMACIES (Demo Tenant)
+-- ============================================================
+INSERT INTO pharmacies (name, owner_name, email, phone, address, status) VALUES
+('PharmacyOS Demo Store', 'Admin User', 'admin@pharmacyos.demo', '9999999999', 'Demo Address, City', 'ACTIVE');
+
+-- ============================================================
+-- 2. USERS (passwords are BCrypt hashes of the plaintext shown in comments)
 -- ============================================================
 -- admin / admin123
-INSERT INTO users (username, password, full_name, role) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Admin User', 'ADMIN');
+INSERT INTO users (pharmacy_id, username, password, full_name, role) VALUES
+(1, 'admin', '$2a$10$1PHOKOiGLfiIGYIPqeGe9eA.IyC2VXLgTZJIns6MmGNUcMc5sPq3S', 'Admin User', 'ADMIN');
 
 -- pharmacist / pharma123
-INSERT INTO users (username, password, full_name, role) VALUES
-('pharmacist', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Rahul Sharma', 'PHARMACIST');
+INSERT INTO users (pharmacy_id, username, password, full_name, role) VALUES
+(1, 'pharmacist', '$2a$10$5hv85kXT0E7Kra3LFk7HmeI6L2/vVc01abWQYmk2BsNuGP4rn4fha', 'Rahul Sharma', 'PHARMACIST');
 
 -- ============================================================
--- SUPPLIERS
+-- 3. SUPPLIERS
 -- ============================================================
-INSERT INTO suppliers (name, phone, email, address) VALUES
-('Sun Pharma', '9876543210', 'contact@sunpharma.com', 'Mumbai, Maharashtra'),
-('Cipla Ltd', '9876543211', 'info@cipla.com', 'Mumbai, Maharashtra'),
-('Dr. Reddys Laboratories', '9876543212', 'support@drreddys.com', 'Hyderabad, Telangana');
+INSERT INTO suppliers (pharmacy_id, name, phone, email, address) VALUES
+(1, 'Sun Pharma', '9876543210', 'contact@sunpharma.com', 'Mumbai, Maharashtra'),
+(1, 'Cipla Ltd', '9876543211', 'info@cipla.com', 'Mumbai, Maharashtra'),
+(1, 'Dr. Reddys Laboratories', '9876543212', 'support@drreddys.com', 'Hyderabad, Telangana');
 
 -- ============================================================
--- MEDICINES
+-- 4. MEDICINES
 -- ============================================================
-INSERT INTO medicines (name, category, manufacturer, unit_price, supplier_id) VALUES
-('Paracetamol 500mg',   'Tablet',   'Sun Pharma',              12.50,  1),
-('Amoxicillin 250mg',   'Capsule',  'Cipla',                   25.00,  2),
-('Cetirizine 10mg',     'Tablet',   'Dr. Reddys',              8.00,   3),
-('Cough Syrup',         'Syrup',    'Cipla',                   85.00,  2),
-('Ibuprofen 400mg',     'Tablet',   'Sun Pharma',              15.00,  1),
-('Metformin 500mg',     'Tablet',   'Dr. Reddys',              10.00,  3),
-('Azithromycin 500mg',  'Tablet',   'Cipla',                   45.00,  2),
-('Vitamin C 500mg',     'Tablet',   'Sun Pharma',              5.00,   1);
+INSERT INTO medicines (pharmacy_id, name, category, manufacturer, unit_price, supplier_id) VALUES
+(1, 'Paracetamol 500mg',   'Tablet',   'Sun Pharma',              12.50,  1),
+(1, 'Amoxicillin 250mg',   'Capsule',  'Cipla',                   25.00,  2),
+(1, 'Cetirizine 10mg',     'Tablet',   'Dr. Reddys',              8.00,   3),
+(1, 'Cough Syrup',         'Syrup',    'Cipla',                   85.00,  2),
+(1, 'Ibuprofen 400mg',     'Tablet',   'Sun Pharma',              15.00,  1),
+(1, 'Metformin 500mg',     'Tablet',   'Dr. Reddys',              10.00,  3),
+(1, 'Azithromycin 500mg',  'Tablet',   'Cipla',                   45.00,  2),
+(1, 'Vitamin C 500mg',     'Tablet',   'Sun Pharma',              5.00,   1);
 
 -- ============================================================
--- MEDICINE BATCHES
+-- 5. MEDICINE BATCHES
 -- (Mix of valid batches, soon-to-expire, and expired)
 -- ============================================================
 -- Paracetamol batches
@@ -74,19 +80,19 @@ INSERT INTO medicine_batches (medicine_id, batch_number, expiry_date, quantity, 
 (8, 'VITC-2025-A', '2028-05-01', 500, 3.00);
 
 -- ============================================================
--- SAMPLE SALES
+-- 6. SAMPLE SALES
 -- ============================================================
 -- Sale 1: Pharmacist sells Paracetamol and Cetirizine
-INSERT INTO sales (user_id, total_amount, sale_date) VALUES
-(2, 149.00, '2026-09-15 10:30:00');
+INSERT INTO sales (pharmacy_id, user_id, total_amount, sale_date) VALUES
+(1, 2, 149.00, '2026-09-15 10:30:00');
 
 INSERT INTO sale_items (sale_id, batch_id, quantity, unit_price, subtotal) VALUES
 (1, 1, 10, 12.50, 125.00),
 (1, 5,  3,  8.00,  24.00);
 
 -- Sale 2: Admin sells Cough Syrup
-INSERT INTO sales (user_id, total_amount, sale_date) VALUES
-(1, 170.00, '2026-09-15 14:00:00');
+INSERT INTO sales (pharmacy_id, user_id, total_amount, sale_date) VALUES
+(1, 1, 170.00, '2026-09-15 14:00:00');
 
 INSERT INTO sale_items (sale_id, batch_id, quantity, unit_price, subtotal) VALUES
 (2, 6, 2, 85.00, 170.00);

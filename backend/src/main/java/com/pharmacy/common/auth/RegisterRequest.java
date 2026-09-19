@@ -10,6 +10,12 @@ public class RegisterRequest {
     private String fullName;
     private String role;
 
+    // Pharmacy Details (only applicable for new registrations which become ADMIN)
+    private String pharmacyName;
+    private String pharmacyEmail;
+    private String pharmacyPhone;
+    private String pharmacyAddress;
+
     public RegisterRequest() {
     }
 
@@ -43,5 +49,37 @@ public class RegisterRequest {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getPharmacyName() {
+        return pharmacyName;
+    }
+
+    public void setPharmacyName(String pharmacyName) {
+        this.pharmacyName = pharmacyName;
+    }
+
+    public String getPharmacyEmail() {
+        return pharmacyEmail;
+    }
+
+    public void setPharmacyEmail(String pharmacyEmail) {
+        this.pharmacyEmail = pharmacyEmail;
+    }
+
+    public String getPharmacyPhone() {
+        return pharmacyPhone;
+    }
+
+    public void setPharmacyPhone(String pharmacyPhone) {
+        this.pharmacyPhone = pharmacyPhone;
+    }
+
+    public String getPharmacyAddress() {
+        return pharmacyAddress;
+    }
+
+    public void setPharmacyAddress(String pharmacyAddress) {
+        this.pharmacyAddress = pharmacyAddress;
     }
 }

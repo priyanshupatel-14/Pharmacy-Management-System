@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../../main.dart';
 import '../constants/app_constants.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 class ApiClient {
   late final Dio dio;
@@ -30,7 +33,12 @@ class ApiClient {
         return handler.next(response);
       },
       onError: (DioException e, handler) {
-        // Handle global errors, e.g., 401 Unauthorized
+        if (e.response?.statusCode == 401) {
+          final context = navigatorKey.currentContext;
+          if (context != null) {
+            context.read<AuthProvider>().logout();
+          }
+        }
         return handler.next(e);
       },
     ));

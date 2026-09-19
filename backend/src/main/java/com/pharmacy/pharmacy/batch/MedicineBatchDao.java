@@ -14,6 +14,8 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import com.pharmacy.common.auth.TenantContext;
+import com.pharmacy.common.exception.ResourceNotFoundException;
 
 /**
  * Data Access Object for medicine_batches table using JdbcTemplate.
@@ -55,9 +57,10 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
+                WHERE m.pharmacy_id = ?
                 ORDER BY mb.expiry_date
                 """;
-        return jdbcTemplate.query(sql, rowMapper);
+        return jdbcTemplate.query(sql, rowMapper, TenantContext.getCurrentPharmacyId());
     }
 
     public Optional<MedicineBatch> findById(Long id) {
@@ -65,9 +68,9 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE mb.id = ?
+                WHERE mb.id = ? AND m.pharmacy_id = ?
                 """;
-        List<MedicineBatch> results = jdbcTemplate.query(sql, rowMapper, id);
+        List<MedicineBatch> results = jdbcTemplate.query(sql, rowMapper, id, TenantContext.getCurrentPharmacyId());
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
@@ -76,10 +79,10 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE mb.medicine_id = ?
+                WHERE mb.medicine_id = ? AND m.pharmacy_id = ?
                 ORDER BY mb.expiry_date
                 """;
-        return jdbcTemplate.query(sql, rowMapper, medicineId);
+        return jdbcTemplate.query(sql, rowMapper, medicineId, TenantContext.getCurrentPharmacyId());
     }
 
     public List<MedicineBatch> findExpired() {
@@ -87,10 +90,10 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE mb.expiry_date < CURRENT_DATE
+                WHERE mb.expiry_date < CURRENT_DATE AND m.pharmacy_id = ?
                 ORDER BY mb.expiry_date
                 """;
-        return jdbcTemplate.query(sql, rowMapper);
+        return jdbcTemplate.query(sql, rowMapper, TenantContext.getCurrentPharmacyId());
     }
 
     public List<MedicineBatch> findExpiringSoon(int days) {
@@ -98,13 +101,20 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE mb.expiry_date >= CURRENT_DATE AND mb.expiry_date <= DATEADD('DAY', ?, CURRENT_DATE)
+                WHERE mb.expiry_date >= CURRENT_DATE AND mb.expiry_date <= DATEADD('DAY', ?, CURRENT_DATE) AND m.pharmacy_id = ?
                 ORDER BY mb.expiry_date
                 """;
-        return jdbcTemplate.query(sql, rowMapper, days);
+        return jdbcTemplate.query(sql, rowMapper, days, TenantContext.getCurrentPharmacyId());
     }
 
     public MedicineBatch save(MedicineBatch batch) {
+        // verify medicine ownership for security
+        String verifySql = "SELECT COUNT(*) FROM medicines WHERE id = ? AND pharmacy_id = ?";
+        Integer count = jdbcTemplate.queryForObject(verifySql, Integer.class, batch.getMedicineId(), TenantContext.getCurrentPharmacyId());
+        if (count == null || count == 0) {
+            throw new ResourceNotFoundException("Medicine not found or access denied");
+        }
+
         String sql = "INSERT INTO medicine_batches (medicine_id, batch_number, expiry_date, quantity, purchase_price) VALUES (?, ?, ?, ?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
@@ -130,34 +140,36 @@ public class MedicineBatchDao {
     }
 
     public int update(MedicineBatch batch) {
-        String sql = "UPDATE medicine_batches SET batch_number = ?, expiry_date = ?, quantity = ?, purchase_price = ? WHERE id = ?";
+        // verify ownership via subquery for security
+        String sql = "UPDATE medicine_batches SET batch_number = ?, expiry_date = ?, quantity = ?, purchase_price = ? WHERE id = ? AND medicine_id IN (SELECT id FROM medicines WHERE pharmacy_id = ?)";
         return jdbcTemplate.update(sql,
                 batch.getBatchNumber(),
                 Date.valueOf(batch.getExpiryDate()),
                 batch.getQuantity(),
                 batch.getPurchasePrice(),
-                batch.getId());
+                batch.getId(),
+                TenantContext.getCurrentPharmacyId());
     }
 
     public int deleteById(Long id) {
-        String sql = "DELETE FROM medicine_batches WHERE id = ?";
-        return jdbcTemplate.update(sql, id);
+        String sql = "DELETE FROM medicine_batches WHERE id = ? AND medicine_id IN (SELECT id FROM medicines WHERE pharmacy_id = ?)";
+        return jdbcTemplate.update(sql, id, TenantContext.getCurrentPharmacyId());
     }
 
     /**
      * Reduce quantity of a batch. Used during sales.
      */
     public int reduceQuantity(Long batchId, int amount) {
-        String sql = "UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ? AND quantity >= ?";
-        return jdbcTemplate.update(sql, amount, batchId, amount);
+        String sql = "UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ? AND quantity >= ? AND medicine_id IN (SELECT id FROM medicines WHERE pharmacy_id = ?)";
+        return jdbcTemplate.update(sql, amount, batchId, amount, TenantContext.getCurrentPharmacyId());
     }
 
     /**
      * Get total stock for a medicine across all batches.
      */
     public int getTotalStock(Long medicineId) {
-        String sql = "SELECT COALESCE(SUM(quantity), 0) FROM medicine_batches WHERE medicine_id = ?";
-        Integer total = jdbcTemplate.queryForObject(sql, Integer.class, medicineId);
+        String sql = "SELECT COALESCE(SUM(quantity), 0) FROM medicine_batches mb JOIN medicines m ON mb.medicine_id = m.id WHERE mb.medicine_id = ? AND m.pharmacy_id = ?";
+        Integer total = jdbcTemplate.queryForObject(sql, Integer.class, medicineId, TenantContext.getCurrentPharmacyId());
         return total != null ? total : 0;
     }
 
@@ -169,9 +181,9 @@ public class MedicineBatchDao {
                 SELECT mb.*, m.name AS medicine_name
                 FROM medicine_batches mb
                 JOIN medicines m ON mb.medicine_id = m.id
-                WHERE mb.medicine_id = ? AND mb.quantity > 0 AND mb.expiry_date >= CURRENT_DATE
+                WHERE mb.medicine_id = ? AND mb.quantity > 0 AND mb.expiry_date >= CURRENT_DATE AND m.pharmacy_id = ?
                 ORDER BY mb.expiry_date ASC
                 """;
-        return jdbcTemplate.query(sql, rowMapper, medicineId);
+        return jdbcTemplate.query(sql, rowMapper, medicineId, TenantContext.getCurrentPharmacyId());
     }
 }

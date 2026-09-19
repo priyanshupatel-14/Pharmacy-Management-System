@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/supplier.dart';
 import '../providers/supplier_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class SupplierFormDialog extends StatefulWidget {
   final Supplier? supplier;
@@ -69,7 +70,11 @@ class _SupplierFormDialogState extends State<SupplierFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -82,34 +87,70 @@ class _SupplierFormDialogState extends State<SupplierFormDialog> {
     final isEditing = widget.supplier != null;
 
     return AlertDialog(
-      title: Text(isEditing ? 'Edit Supplier' : 'Add Supplier'),
+      title: Text(isEditing ? 'Edit Supplier' : 'Add New Supplier'),
+      titlePadding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 32),
+      actionsPadding: const EdgeInsets.all(32),
       content: SizedBox(
-        width: 400,
+        width: 480,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Company Information',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Supplier Name *'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Company/Supplier Name *',
+                    hintText: 'e.g. PharmaCorp Ltd.',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Supplier name is required' : null,
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Contact Details',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone'),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number',
+                          hintText: 'e.g. +91 9876543210',
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'e.g. contact@pharma.com',
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _addressController,
-                  decoration: const InputDecoration(labelText: 'Address'),
+                  decoration: const InputDecoration(
+                    labelText: 'Physical Address',
+                    hintText: 'Full business address...',
+                  ),
                   maxLines: 3,
                 ),
               ],
@@ -122,11 +163,11 @@ class _SupplierFormDialogState extends State<SupplierFormDialog> {
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _isSaving ? null : _save,
           child: _isSaving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Save'),
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(isEditing ? 'Save Changes' : 'Add Supplier'),
         ),
       ],
     );

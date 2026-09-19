@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../../core/widgets/page_header.dart';
+import '../../../core/widgets/kpi_card.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/widgets/status_badge.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 
@@ -15,7 +21,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch data on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().fetchDashboardData();
     });
@@ -28,94 +33,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       body: dashboard.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingState(message: 'Loading dashboard data...')
           : dashboard.errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        dashboard.errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => context.read<DashboardProvider>().fetchDashboardData(),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
+              ? ErrorState(
+                  message: dashboard.errorMessage!,
+                  onRetry: () => context.read<DashboardProvider>().fetchDashboardData(),
                 )
-              : Padding(
-                  padding: const EdgeInsets.all(16.0),
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       PageHeader(
-                        title: 'Dashboard',
-                        subtitle: 'Welcome, ${auth.fullName ?? auth.username}!',
-                        action: IconButton(
-                          icon: const Icon(Icons.refresh),
+                        title: 'Dashboard Overview',
+                        subtitle: 'Welcome back, ${auth.fullName ?? auth.username}. Here is what is happening today.',
+                        action: FilledButton.icon(
                           onPressed: () => context.read<DashboardProvider>().fetchDashboardData(),
-                          tooltip: 'Refresh',
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Refresh'),
                         ),
                       ),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            int crossAxisCount = constraints.maxWidth > 800 ? 3 : 2;
-                            return GridView.count(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 1.5,
+                      
+                      // KPI Grid
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          int crossAxisCount = 4;
+                          if (constraints.maxWidth < 1200) crossAxisCount = 3;
+                          if (constraints.maxWidth < 900) crossAxisCount = 2;
+                          if (constraints.maxWidth < 600) crossAxisCount = 1;
+
+                          return GridView.count(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            childAspectRatio: crossAxisCount == 1 ? 2.5 : 2.0,
+                            children: [
+                              KpiCard(
+                                title: 'Total Sales',
+                                value: CurrencyFormatter.format(dashboard.totalSales),
+                                icon: Icons.insights,
+                                color: AppTheme.primaryColor,
+                              ),
+                              KpiCard(
+                                title: 'Total Inventory',
+                                value: dashboard.totalStock.toString(),
+                                subtitle: '${dashboard.totalMedicines} unique items',
+                                icon: Icons.inventory_2_outlined,
+                                color: AppTheme.secondaryColor,
+                              ),
+                              KpiCard(
+                                title: 'Low Stock Alerts',
+                                value: dashboard.lowStockCount.toString(),
+                                icon: Icons.warning_amber_rounded,
+                                color: Colors.orange.shade600,
+                              ),
+                              KpiCard(
+                                title: 'Expiring Soon',
+                                value: dashboard.expiringSoonCount.toString(),
+                                subtitle: '${dashboard.expiredBatchesCount} already expired',
+                                icon: Icons.event_busy_outlined,
+                                color: Colors.red.shade600,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Tables Row
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (constraints.maxWidth < 900) {
+                            return Column(
                               children: [
-                                _buildStatCard(
-                                  context,
-                                  title: 'Total Medicines',
-                                  value: dashboard.totalMedicines.toString(),
-                                  icon: Icons.medical_services,
-                                  color: Colors.blue,
-                                ),
-                                _buildStatCard(
-                                  context,
-                                  title: 'Total Stock',
-                                  value: dashboard.totalStock.toString(),
-                                  icon: Icons.inventory,
-                                  color: Colors.teal,
-                                ),
-                                _buildStatCard(
-                                  context,
-                                  title: 'Total Sales (₹)',
-                                  value: dashboard.totalSales.toStringAsFixed(2),
-                                  icon: Icons.attach_money,
-                                  color: Colors.green,
-                                ),
-                                _buildStatCard(
-                                  context,
-                                  title: 'Low Stock',
-                                  value: dashboard.lowStockCount.toString(),
-                                  icon: Icons.warning_amber,
-                                  color: Colors.orange,
-                                ),
-                                _buildStatCard(
-                                  context,
-                                  title: 'Expiring Soon',
-                                  value: dashboard.expiringSoonCount.toString(),
-                                  icon: Icons.schedule,
-                                  color: Colors.amber,
-                                ),
-                                _buildStatCard(
-                                  context,
-                                  title: 'Expired Batches',
-                                  value: dashboard.expiredBatchesCount.toString(),
-                                  icon: Icons.error_outline,
-                                  color: Colors.red,
-                                ),
+                                _buildRecentSalesTable(dashboard),
+                                const SizedBox(height: 24),
+                                _buildLowStockTable(dashboard),
                               ],
                             );
-                          },
-                        ),
+                          }
+                          
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _buildRecentSalesTable(dashboard),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                flex: 2,
+                                child: _buildLowStockTable(dashboard),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -123,37 +138,184 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(
-    BuildContext context, {
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildRecentSalesTable(DashboardProvider dashboard) {
     return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recent Sales',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  'Last 5 transactions',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (dashboard.recentSales.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32.0),
+              child: EmptyState(
+                title: 'No sales yet',
+                message: 'Sales transactions will appear here.',
+                icon: Icons.receipt_long_outlined,
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: constraints.maxWidth > 500 ? constraints.maxWidth : 500,
+                    ),
+                    child: Table(
+                      columnWidths: const {
+                        0: IntrinsicColumnWidth(), // ID
+                        1: FlexColumnWidth(2), // Date
+                        2: FlexColumnWidth(2), // User ID
+                        3: FlexColumnWidth(1.5), // Amount
+                      },
+                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                      children: [
+                        TableRow(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF1F5F9),
+                            border: Border(bottom: BorderSide(color: AppTheme.borderLight)),
+                          ),
+                          children: [
+                            _buildTableHeader('ID', context),
+                            _buildTableHeader('DATE', context),
+                            _buildTableHeader('USER ID', context),
+                            _buildTableHeader('AMOUNT', context, isRightAlign: true),
+                          ],
+                        ),
+                        ...dashboard.recentSales.map((sale) {
+                          final saleDate = sale['saleDate'] != null
+                              ? DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(sale['saleDate']))
+                              : 'N/A';
+                          final amount = (sale['totalAmount'] as num?)?.toDouble() ?? 0.0;
+
+                          return TableRow(
+                            decoration: const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: AppTheme.borderLight)),
+                            ),
+                            children: [
+                              _buildTableCell('#${sale['id']}', context),
+                              _buildTableCell(saleDate, context),
+                              _buildTableCell('User ${sale['userId']}', context),
+                              _buildTableCell(
+                                CurrencyFormatter.format(amount),
+                                context,
+                                isRightAlign: true,
+                                isBold: true,
+                              ),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
                   ),
+                );
+              },
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableHeader(String text, BuildContext context, {bool isRightAlign = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Text(
+        text,
+        textAlign: isRightAlign ? TextAlign.right : TextAlign.left,
+        style: Theme.of(context).dataTableTheme.headingTextStyle ?? 
+            const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  Widget _buildTableCell(String text, BuildContext context, {bool isRightAlign = false, bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Text(
+        text,
+        textAlign: isRightAlign ? TextAlign.right : TextAlign.left,
+        style: Theme.of(context).dataTableTheme.dataTextStyle?.copyWith(
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+            ) ??
+            TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: isBold ? FontWeight.w600 : FontWeight.normal),
+      ),
+    );
+  }
+
+  Widget _buildLowStockTable(DashboardProvider dashboard) {
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Critical Stock',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const StatusBadge(label: 'Action Needed', status: BadgeStatus.error),
+              ],
             ),
-          ],
-        ),
+          ),
+          const Divider(height: 1),
+          if (dashboard.lowStockItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32.0),
+              child: EmptyState(
+                title: 'Stock is healthy',
+                message: 'No items are currently running low.',
+                icon: Icons.check_circle_outline,
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('MEDICINE')),
+                  DataColumn(label: Text('STOCK')),
+                ],
+                rows: dashboard.lowStockItems.map((item) {
+                  final name = item['name'] ?? 'Unknown';
+                  final stock = item['totalStock']?.toString() ?? '0';
+                  
+                  return DataRow(cells: [
+                    DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w500))),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(stock, style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700),
+                        ],
+                      )
+                    ),
+                  ]);
+                }).toList(),
+              ),
+            ),
+        ],
       ),
     );
   }

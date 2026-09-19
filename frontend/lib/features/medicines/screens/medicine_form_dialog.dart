@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/medicine.dart';
 import '../providers/medicine_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class MedicineFormDialog extends StatefulWidget {
   final Medicine? medicine;
@@ -72,7 +73,11 @@ class _MedicineFormDialogState extends State<MedicineFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -86,51 +91,86 @@ class _MedicineFormDialogState extends State<MedicineFormDialog> {
     final isEditing = widget.medicine != null;
 
     return AlertDialog(
-      title: Text(isEditing ? 'Edit Medicine' : 'Add Medicine'),
+      title: Text(isEditing ? 'Edit Medicine' : 'Add New Medicine'),
+      titlePadding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 32),
+      actionsPadding: const EdgeInsets.all(32),
       content: SizedBox(
-        width: 400,
+        width: 480,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Medicine Name *'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                Text(
+                  'Medicine Details',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _categoryController,
-                  decoration: const InputDecoration(labelText: 'Category *'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Medicine Name *',
+                    hintText: 'e.g. Amoxicillin 500mg',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Medicine name is required' : null,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _categoryController,
+                        decoration: const InputDecoration(
+                          labelText: 'Category *',
+                          hintText: 'e.g. Antibiotic',
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Category is required' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _unitPriceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Unit Price (₹) *',
+                          prefixText: '₹ ',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'Required';
+                          final parsed = double.tryParse(value);
+                          if (parsed == null || parsed < 0) return 'Valid positive number required';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Supply Chain',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _manufacturerController,
-                  decoration: const InputDecoration(labelText: 'Manufacturer'),
+                  decoration: const InputDecoration(
+                    labelText: 'Manufacturer',
+                    hintText: 'e.g. Pfizer',
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _unitPriceController,
-                  decoration: const InputDecoration(labelText: 'Unit Price *'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Required';
-                    final parsed = double.tryParse(value);
-                    if (parsed == null || parsed < 0) return 'Enter a valid positive number';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 DropdownButtonFormField<int?>(
-                  decoration: const InputDecoration(labelText: 'Supplier'),
+                  decoration: const InputDecoration(labelText: 'Primary Supplier'),
                   initialValue: _selectedSupplierId,
+                  isExpanded: true,
                   items: [
                     const DropdownMenuItem<int?>(
                       value: null,
-                      child: Text('None'),
+                      child: Text('None / Select Supplier'),
                     ),
                     ...provider.suppliers.map((s) {
                       return DropdownMenuItem<int?>(
@@ -155,11 +195,11 @@ class _MedicineFormDialogState extends State<MedicineFormDialog> {
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _isSaving ? null : _save,
           child: _isSaving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Save'),
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(isEditing ? 'Save Changes' : 'Add Medicine'),
         ),
       ],
     );

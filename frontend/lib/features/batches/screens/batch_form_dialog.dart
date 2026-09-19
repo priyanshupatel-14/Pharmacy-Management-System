@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/medicine_batch.dart';
 import '../providers/batch_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class BatchFormDialog extends StatefulWidget {
   final MedicineBatch? batch;
@@ -52,6 +53,19 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
       initialDate: initialDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primaryColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppTheme.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -65,7 +79,11 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedMedicineId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a medicine'), backgroundColor: Colors.red),
+        SnackBar(
+          content: const Text('Please select a medicine'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -97,7 +115,11 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -111,18 +133,28 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
     final isEditing = widget.batch != null;
 
     return AlertDialog(
-      title: Text(isEditing ? 'Edit Batch' : 'Add Batch'),
+      title: Text(isEditing ? 'Edit Batch' : 'Add New Batch'),
+      titlePadding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 32),
+      actionsPadding: const EdgeInsets.all(32),
       content: SizedBox(
-        width: 400,
+        width: 480,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Batch Information',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 16),
                 DropdownButtonFormField<int?>(
                   decoration: const InputDecoration(labelText: 'Medicine *'),
                   initialValue: _selectedMedicineId,
+                  isExpanded: true,
                   items: [
                     const DropdownMenuItem<int?>(
                       value: null,
@@ -141,46 +173,76 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
                     });
                   },
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _batchNumberController,
-                  decoration: const InputDecoration(labelText: 'Batch Number *'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _batchNumberController,
+                        decoration: const InputDecoration(
+                          labelText: 'Batch Number *',
+                          hintText: 'e.g. B-101',
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _expiryDateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Expiry Date *',
+                          hintText: 'YYYY-MM-DD',
+                          suffixIcon: Icon(Icons.calendar_today, size: 18),
+                        ),
+                        readOnly: true,
+                        onTap: () => _selectDate(context),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Inventory & Pricing',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _expiryDateController,
-                  decoration: const InputDecoration(
-                    labelText: 'Expiry Date (YYYY-MM-DD) *',
-                    suffixIcon: Icon(Icons.calendar_today),
-                  ),
-                  readOnly: true,
-                  onTap: () => _selectDate(context),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _quantityController,
-                  decoration: const InputDecoration(labelText: 'Quantity *'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Required';
-                    final parsed = int.tryParse(value);
-                    if (parsed == null || parsed < 0) return 'Valid positive integer required';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _purchasePriceController,
-                  decoration: const InputDecoration(labelText: 'Purchase Price *'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Required';
-                    final parsed = double.tryParse(value);
-                    if (parsed == null || parsed < 0) return 'Valid positive number required';
-                    return null;
-                  },
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _quantityController,
+                        decoration: const InputDecoration(
+                          labelText: 'Initial Quantity *',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'Required';
+                          final parsed = int.tryParse(value);
+                          if (parsed == null || parsed < 0) return 'Valid positive integer required';
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _purchasePriceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Purchase Price (₹) *',
+                          prefixText: '₹ ',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'Required';
+                          final parsed = double.tryParse(value);
+                          if (parsed == null || parsed < 0) return 'Valid positive number required';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -192,11 +254,11 @@ class _BatchFormDialogState extends State<BatchFormDialog> {
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _isSaving ? null : _save,
           child: _isSaving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Save'),
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(isEditing ? 'Save Changes' : 'Add Batch'),
         ),
       ],
     );

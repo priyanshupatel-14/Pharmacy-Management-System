@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/sale_provider.dart';
 import '../models/sale_request.dart';
 import '../../stock/models/stock_info.dart';
@@ -56,23 +59,23 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     
     final qtyStr = _qtyController.text.trim();
     if (qtyStr.isEmpty) {
-      _showError('Enter quantity');
+      _showError('Please enter a quantity');
       return;
     }
     
     final qty = int.tryParse(qtyStr);
     if (qty == null || qty <= 0) {
-      _showError('Enter valid quantity');
+      _showError('Please enter a valid positive quantity');
       return;
     }
 
     if (qty > _selectedBatch!.quantity) {
-      _showError('Insufficient stock for this batch');
+      _showError('Insufficient stock. Only ${_selectedBatch!.quantity} available.');
       return;
     }
 
     if (_selectedBatch!.isExpired) {
-      _showError('Cannot sell expired batch');
+      _showError('Cannot sell an expired batch');
       return;
     }
 
@@ -81,7 +84,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     if (existingIndex >= 0) {
       final newQty = _billItems[existingIndex].quantity + qty;
       if (newQty > _selectedBatch!.quantity) {
-        _showError('Total quantity exceeds batch stock');
+        _showError('Total quantity in bill exceeds available stock');
         return;
       }
       setState(() {
@@ -117,12 +120,18 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _submitSale() async {
     if (_billItems.isEmpty) {
-      _showError('Add at least one item');
+      _showError('Add at least one item to complete the sale');
       return;
     }
 
@@ -137,7 +146,11 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
       final success = await context.read<SaleProvider>().createSale(requests);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sale completed successfully'), backgroundColor: Colors.green),
+          SnackBar(
+            content: const Text('Sale completed successfully'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         Navigator.of(context).pop(true);
       }
@@ -155,10 +168,14 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Sale'),
+        title: const Text('New Transaction'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -166,32 +183,38 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
             Expanded(
               flex: 1,
               child: Card(
-                elevation: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Add Item to Bill', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
+                      Text('Add to Cart', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Select medicine and batch to add to the current bill.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 24),
                       DropdownButtonFormField<StockInfo>(
-                        decoration: const InputDecoration(labelText: 'Select Medicine'),
+                        decoration: const InputDecoration(labelText: 'Medicine'),
                         initialValue: _selectedStock,
+                        isExpanded: true,
                         items: provider.availableStock.where((s) => s.totalStock > 0).map((s) {
                           return DropdownMenuItem(value: s, child: Text(s.medicineName));
                         }).toList(),
                         onChanged: (val) {
                           setState(() {
                             _selectedStock = val;
-                            _selectedBatch = null; // Reset batch
+                            _selectedBatch = null;
                           });
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       DropdownButtonFormField<MedicineBatch>(
-                        decoration: const InputDecoration(labelText: 'Select Batch'),
+                        decoration: const InputDecoration(labelText: 'Batch'),
                         initialValue: _selectedBatch,
+                        isExpanded: true,
                         items: _selectedStock?.batches.where((b) => b.quantity > 0).map((b) {
                           final label = '${b.batchNumber} (Stock: ${b.quantity})${b.isExpired ? ' - EXPIRED' : ''}';
                           return DropdownMenuItem(value: b, child: Text(label));
@@ -202,19 +225,20 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                           });
                         },
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
+                      const SizedBox(height: 20),
+                      TextFormField(
                         controller: _qtyController,
                         decoration: const InputDecoration(labelText: 'Quantity'),
                         keyboardType: TextInputType.number,
+                        onFieldSubmitted: (_) => _addItem(),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
+                        child: FilledButton.icon(
                           onPressed: _addItem,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Item'),
+                          icon: const Icon(Icons.add_shopping_cart, size: 18),
+                          label: const Text('Add to Bill'),
                         ),
                       ),
                     ],
@@ -222,72 +246,115 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 24),
             // Right Side: Bill Details
             Expanded(
               flex: 2,
               child: Card(
-                elevation: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Current Bill', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: _billItems.isEmpty
-                            ? const Center(child: Text('No items added yet.'))
-                            : ListView(
-                                children: [
-                                  DataTable(
-                                    columns: const [
-                                      DataColumn(label: Text('Item')),
-                                      DataColumn(label: Text('Batch')),
-                                      DataColumn(label: Text('Price')),
-                                      DataColumn(label: Text('Qty')),
-                                      DataColumn(label: Text('Subtotal')),
-                                      DataColumn(label: Text('')),
-                                    ],
-                                    rows: _billItems.asMap().entries.map((entry) {
-                                      final i = entry.key;
-                                      final item = entry.value;
-                                      return DataRow(cells: [
-                                        DataCell(Text(item.medicineName)),
-                                        DataCell(Text(item.batch.batchNumber)),
-                                        DataCell(Text('₹${item.unitPrice.toStringAsFixed(2)}')),
-                                        DataCell(Text(item.quantity.toString())),
-                                        DataCell(Text('₹${item.subtotal.toStringAsFixed(2)}')),
-                                        DataCell(
-                                          IconButton(
-                                            icon: const Icon(Icons.remove_circle, color: Colors.red),
-                                            onPressed: () => _removeItem(i),
-                                          ),
-                                        ),
-                                      ]);
-                                    }).toList(),
-                                  ),
-                                ],
-                              ),
-                      ),
-                      const Divider(thickness: 2),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total Amount:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text('₹${total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green)),
+                          Text('Current Bill', style: Theme.of(context).textTheme.titleLarge),
+                          Text('${_billItems.length} items', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary)),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: _billItems.isEmpty
+                            ? const EmptyState(
+                                title: 'Cart is empty',
+                                message: 'Select items from the left to add them to the bill.',
+                                icon: Icons.shopping_cart_outlined,
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppTheme.borderLight),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SingleChildScrollView(
+                                    child: DataTable(
+                                      headingRowColor: WidgetStateProperty.all(AppTheme.backgroundColor),
+                                      columns: const [
+                                        DataColumn(label: Text('ITEM')),
+                                        DataColumn(label: Text('BATCH')),
+                                        DataColumn(label: Text('PRICE')),
+                                        DataColumn(label: Text('QTY')),
+                                        DataColumn(label: Text('SUBTOTAL', textAlign: TextAlign.right)),
+                                        DataColumn(label: Text('')),
+                                      ],
+                                      rows: _billItems.asMap().entries.map((entry) {
+                                        final i = entry.key;
+                                        final item = entry.value;
+                                        return DataRow(cells: [
+                                          DataCell(Text(item.medicineName, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                          DataCell(Text(item.batch.batchNumber)),
+                                          DataCell(Text(CurrencyFormatter.format(item.unitPrice))),
+                                          DataCell(Text(item.quantity.toString())),
+                                          DataCell(
+                                            Container(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                CurrencyFormatter.format(item.subtotal),
+                                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            IconButton(
+                                              icon: Icon(Icons.remove_circle_outline, color: Colors.red.shade400, size: 18),
+                                              tooltip: 'Remove',
+                                              onPressed: () => _removeItem(i),
+                                            ),
+                                          ),
+                                        ]);
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.borderLight),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total Amount Payable', style: Theme.of(context).textTheme.titleMedium),
+                            Text(
+                              CurrencyFormatter.format(total),
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    color: AppTheme.primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        height: 56,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
                           onPressed: _isSubmitting || _billItems.isEmpty ? null : _submitSale,
                           child: _isSubmitting
                               ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text('Complete Sale', style: TextStyle(fontSize: 18, color: Colors.white)),
+                              : const Text('Complete Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

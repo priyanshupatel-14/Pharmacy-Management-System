@@ -4,6 +4,11 @@ import com.pharmacy.common.exception.BadRequestException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import org.springframework.transaction.annotation.Transactional;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -40,22 +45,29 @@ public class AuthService {
             throw new BadRequestException("Invalid username or password");
         }
 
-        // Generate a simple session token (UUID-based, appropriate for a college project)
+        // Generate a simple session token
         String token = UUID.randomUUID().toString();
+        // Set expiry to 7 days from now
+        Timestamp expiresAt = Timestamp.from(Instant.now().plus(7, ChronoUnit.DAYS));
+        authDao.createSession(token, user.getId(), expiresAt);
+
+        String pharmacyName = authDao.getPharmacyName(user.getPharmacyId());
 
         return new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getFullName(),
                 user.getRole(),
-                token
+                token,
+                pharmacyName
         );
     }
 
     /**
-     * Register a new user.
+     * Register a new user and a new pharmacy.
      * Password is hashed with BCrypt before storage.
      */
+    @Transactional
     public LoginResponse register(RegisterRequest request) {
         if (request.getUsername() == null || request.getUsername().isBlank()) {
             throw new BadRequestException("Username is required");
@@ -66,38 +78,49 @@ public class AuthService {
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new BadRequestException("Full name is required");
         }
+        if (request.getPharmacyName() == null || request.getPharmacyName().isBlank()) {
+            throw new BadRequestException("Pharmacy name is required");
+        }
 
         // Check for duplicate username
         if (authDao.existsByUsername(request.getUsername())) {
             throw new BadRequestException("Username already exists: " + request.getUsername());
         }
 
-        // Hash password
+        // 1. Create Pharmacy
+        Long pharmacyId = authDao.createPharmacy(
+                request.getPharmacyName(),
+                request.getFullName(),
+                request.getPharmacyEmail(),
+                request.getPharmacyPhone(),
+                request.getPharmacyAddress()
+        );
+
+        // 2. Hash password
         String hashedPassword = passwordEncoder.encode(request.getPassword());
 
-        // Create user
+        // 3. Create user
         User user = new User();
+        user.setPharmacyId(pharmacyId);
         user.setUsername(request.getUsername());
         user.setPassword(hashedPassword);
         user.setFullName(request.getFullName());
-        user.setRole(request.getRole() != null ? request.getRole() : "PHARMACIST");
-
-        // Validate role
-        if (!user.getRole().equals("ADMIN") && !user.getRole().equals("PHARMACIST")) {
-            throw new BadRequestException("Role must be ADMIN or PHARMACIST");
-        }
+        user.setRole("ADMIN"); // New registrations are always ADMIN of their new pharmacy
 
         user = authDao.save(user);
 
-        // Generate token
+        // 4. Generate token and session
         String token = UUID.randomUUID().toString();
+        Timestamp expiresAt = Timestamp.from(Instant.now().plus(7, ChronoUnit.DAYS));
+        authDao.createSession(token, user.getId(), expiresAt);
 
         return new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getFullName(),
                 user.getRole(),
-                token
+                token,
+                request.getPharmacyName()
         );
     }
 }

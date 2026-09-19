@@ -8,8 +8,11 @@ import 'features/suppliers/providers/supplier_provider.dart';
 import 'features/stock/providers/stock_provider.dart';
 import 'features/batches/providers/batch_provider.dart';
 import 'features/sales/providers/sale_provider.dart';
+import 'features/staff/providers/staff_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/shell/screens/app_shell.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(
@@ -22,6 +25,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => StockProvider()),
         ChangeNotifierProvider(create: (_) => BatchProvider()),
         ChangeNotifierProvider(create: (_) => SaleProvider()),
+        ChangeNotifierProvider(create: (_) => StaffProvider()),
       ],
       child: const MyApp(),
     ),
@@ -34,6 +38,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Pharmacy Management System',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,

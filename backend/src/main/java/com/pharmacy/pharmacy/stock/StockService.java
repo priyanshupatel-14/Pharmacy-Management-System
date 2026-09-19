@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.pharmacy.common.auth.TenantContext;
 
 /**
  * Service for stock queries. Stock data comes from medicine_batches.
@@ -36,6 +37,7 @@ public class StockService {
                 SELECT m.id, m.name, m.category, COALESCE(SUM(mb.quantity), 0) AS total_stock
                 FROM medicines m
                 LEFT JOIN medicine_batches mb ON m.id = mb.medicine_id
+                WHERE m.pharmacy_id = ?
                 GROUP BY m.id, m.name, m.category
                 ORDER BY m.name
                 """;
@@ -48,7 +50,7 @@ public class StockService {
             info.setTotalStock(rs.getInt("total_stock"));
             // Batches not included in summary view for performance
             return info;
-        });
+        }, TenantContext.getCurrentPharmacyId());
     }
 
     /**
@@ -78,6 +80,7 @@ public class StockService {
                 SELECT m.id, m.name, m.category, COALESCE(SUM(mb.quantity), 0) AS total_stock
                 FROM medicines m
                 LEFT JOIN medicine_batches mb ON m.id = mb.medicine_id
+                WHERE m.pharmacy_id = ?
                 GROUP BY m.id, m.name, m.category
                 HAVING COALESCE(SUM(mb.quantity), 0) < ?
                 ORDER BY total_stock ASC
@@ -90,6 +93,6 @@ public class StockService {
             info.setCategory(rs.getString("category"));
             info.setTotalStock(rs.getInt("total_stock"));
             return info;
-        }, threshold);
+        }, TenantContext.getCurrentPharmacyId(), threshold);
     }
 }

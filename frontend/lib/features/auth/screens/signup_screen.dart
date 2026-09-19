@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
-import 'signup_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
+  final _pharmacyNameController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -19,15 +20,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _pharmacyNameController.dispose();
+    _fullNameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
+  void _handleSignup() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.login(
+      final success = await authProvider.register(
+        _pharmacyNameController.text,
+        _fullNameController.text,
         _usernameController.text,
         _passwordController.text,
       );
@@ -35,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.errorMessage ?? 'Login failed'),
+            content: Text(authProvider.errorMessage ?? 'Signup failed'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -75,13 +80,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Welcome back',
+                    'Create your Pharmacy',
                     style: Theme.of(context).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter your credentials to access your account',
+                    'Set up your multi-tenant workspace',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textSecondary,
                         ),
@@ -104,13 +109,33 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             TextFormField(
+                              controller: _pharmacyNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Pharmacy Name',
+                                prefixIcon: Icon(Icons.store),
+                              ),
+                              validator: (value) =>
+                                  value == null || value.isEmpty ? 'Please enter pharmacy name' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: _fullNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Owner Full Name',
+                                prefixIcon: Icon(Icons.badge_outlined),
+                              ),
+                              validator: (value) =>
+                                  value == null || value.isEmpty ? 'Please enter your full name' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
                               controller: _usernameController,
                               decoration: const InputDecoration(
-                                labelText: 'Username',
+                                labelText: 'Admin Username',
                                 prefixIcon: Icon(Icons.person_outline),
                               ),
                               validator: (value) =>
-                                  value == null || value.isEmpty ? 'Please enter your username' : null,
+                                  value == null || value.isEmpty ? 'Please enter admin username' : null,
                             ),
                             const SizedBox(height: 20),
                             TextFormField(
@@ -131,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               obscureText: !_isPasswordVisible,
                               validator: (value) =>
-                                  value == null || value.isEmpty ? 'Please enter your password' : null,
+                                  value == null || value.length < 4 ? 'Password must be at least 4 characters' : null,
                             ),
                             const SizedBox(height: 32),
                             Consumer<AuthProvider>(
@@ -143,33 +168,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  onPressed: auth.isLoading ? null : _handleLogin,
+                                  onPressed: auth.isLoading ? null : _handleSignup,
                                   child: auth.isLoading
                                       ? const SizedBox(
                                           height: 20,
                                           width: 20,
                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                         )
-                                      : const Text('Sign In', style: TextStyle(fontSize: 16)),
+                                      : const Text('Sign Up', style: TextStyle(fontSize: 16)),
                                 );
                               },
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () {
+                                // Navigate back to login
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Already have an account? Sign in'),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const SignupScreen()),
-                      );
-                    },
-                    child: const Text("Don't have a pharmacy? Sign up"),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
                   Text(
                     'PharmacyOS © ${DateTime.now().year}',
                     style: Theme.of(context).textTheme.bodySmall,

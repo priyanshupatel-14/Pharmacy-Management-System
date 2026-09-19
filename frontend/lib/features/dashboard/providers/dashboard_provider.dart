@@ -15,6 +15,9 @@ class DashboardProvider extends ChangeNotifier {
   int _expiringSoonCount = 0;
   double _totalSales = 0.0;
 
+  List<dynamic> _recentSales = [];
+  List<dynamic> _lowStockItems = [];
+
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -24,6 +27,9 @@ class DashboardProvider extends ChangeNotifier {
   int get expiredBatchesCount => _expiredBatchesCount;
   int get expiringSoonCount => _expiringSoonCount;
   double get totalSales => _totalSales;
+  
+  List<dynamic> get recentSales => _recentSales;
+  List<dynamic> get lowStockItems => _lowStockItems;
 
   Future<void> fetchDashboardData() async {
     _isLoading = true;
@@ -31,8 +37,6 @@ class DashboardProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Execute requests concurrently if possible, but sequential is fine for simplicity and error isolation
-      
       // 1. Medicines
       try {
         final medicinesResponse = await _apiClient.dio.get('/medicines');
@@ -61,7 +65,10 @@ class DashboardProvider extends ChangeNotifier {
       try {
         final lowStockResponse = await _apiClient.dio.get('/stock/low');
         if (lowStockResponse.data is List) {
-          _lowStockCount = (lowStockResponse.data as List).length;
+          final list = lowStockResponse.data as List;
+          _lowStockCount = list.length;
+          // Store top 5 low stock items
+          _lowStockItems = list.take(5).toList();
         }
       } catch (e) {
         debugPrint('Error fetching low stock: $e');
@@ -91,11 +98,14 @@ class DashboardProvider extends ChangeNotifier {
       try {
         final salesResponse = await _apiClient.dio.get('/sales');
         if (salesResponse.data is List) {
+          final list = salesResponse.data as List;
           double salesTotal = 0.0;
-          for (var item in salesResponse.data) {
+          for (var item in list) {
             salesTotal += (item['totalAmount'] as num?)?.toDouble() ?? 0.0;
           }
           _totalSales = salesTotal;
+          // Store 5 most recent sales (assuming API returns chronologically, we reverse to get newest if it's oldest first, but let's just reverse to be safe assuming ID ascending)
+          _recentSales = list.reversed.take(5).toList();
         }
       } catch (e) {
         debugPrint('Error fetching sales: $e');

@@ -19,6 +19,12 @@ public class MedicineBatchController {
         this.batchService = batchService;
     }
 
+    private void requireAdmin() {
+        if (!"ADMIN".equals(com.pharmacy.common.auth.TenantContext.getCurrentUser().getRole())) {
+            throw new com.pharmacy.common.exception.BadRequestException("Only ADMIN can perform this action");
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<MedicineBatch>> getAllBatches() {
         return ResponseEntity.ok(batchService.getAllBatches());
@@ -47,17 +53,20 @@ public class MedicineBatchController {
 
     @PostMapping
     public ResponseEntity<MedicineBatch> createBatch(@RequestBody MedicineBatch batch) {
+        requireAdmin();
         MedicineBatch created = batchService.createBatch(batch);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<MedicineBatch> updateBatch(@PathVariable Long id, @RequestBody MedicineBatch batch) {
+        requireAdmin();
         return ResponseEntity.ok(batchService.updateBatch(id, batch));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBatch(@PathVariable Long id) {
+        requireAdmin();
         batchService.deleteBatch(id);
         return ResponseEntity.noContent().build();
     }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/widgets/page_header.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/widgets/data_table_card.dart';
 import '../providers/supplier_provider.dart';
 import 'supplier_form_dialog.dart';
 import '../models/supplier.dart';
@@ -32,7 +34,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(supplier == null ? 'Supplier added successfully' : 'Supplier updated successfully'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -48,7 +51,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -59,13 +63,21 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         final success = await context.read<SupplierProvider>().deleteSupplier(supplier.id);
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Supplier deleted successfully'), backgroundColor: Colors.green),
+            SnackBar(
+              content: const Text('Supplier deleted successfully'),
+              backgroundColor: Colors.green.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }
@@ -77,88 +89,94 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final provider = context.watch<SupplierProvider>();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showFormDialog(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Supplier'),
-      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
             PageHeader(
-              title: 'Supplier Management',
-              subtitle: 'Manage pharmacy suppliers and their contact information',
-              action: IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh List',
-                onPressed: () => provider.fetchSuppliers(),
+              title: 'Suppliers',
+              subtitle: 'Manage pharmaceutical suppliers and contacts',
+              action: FilledButton.icon(
+                onPressed: () => _showFormDialog(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Supplier'),
               ),
             ),
+            
+            // Toolbar
+            Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: () => provider.fetchSuppliers(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
             Expanded(
               child: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const LoadingState(message: 'Loading suppliers...')
                   : provider.errorMessage != null
-                      ? Center(
-                          child: Text(
-                            provider.errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 16),
-                          ),
+                      ? ErrorState(
+                          message: provider.errorMessage!,
+                          onRetry: () => provider.fetchSuppliers(),
                         )
                       : provider.suppliers.isEmpty
-                          ? const Center(child: Text('No suppliers found.'))
-                          : Card(
-                              elevation: 2,
-                              child: ListView(
-                                children: [
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: DataTable(
-                                      columns: const [
-                                        DataColumn(label: Text('ID')),
-                                        DataColumn(label: Text('Name')),
-                                        DataColumn(label: Text('Phone')),
-                                        DataColumn(label: Text('Email')),
-                                        DataColumn(label: Text('Address')),
-                                        DataColumn(label: Text('Actions')),
-                                      ],
-                                      rows: provider.suppliers.map((sup) {
-                                        return DataRow(cells: [
-                                          DataCell(Text(sup.id.toString())),
-                                          DataCell(Text(sup.name)),
-                                          DataCell(Text(sup.phone ?? '-')),
-                                          DataCell(Text(sup.email ?? '-')),
-                                          DataCell(
-                                            SizedBox(
-                                              width: 200,
-                                              child: Text(
-                                                sup.address ?? '-',
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                                  tooltip: 'Edit',
-                                                  onPressed: () => _showFormDialog(sup),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                                  tooltip: 'Delete',
-                                                  onPressed: () => _confirmDelete(sup),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ]);
-                                      }).toList(),
-                                    ),
-                                  ),
+                          ? const EmptyState(
+                              title: 'No suppliers found',
+                              message: 'Add a new supplier to get started.',
+                              icon: Icons.local_shipping_outlined,
+                            )
+                          : DataTableCard(
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('ID')),
+                                  DataColumn(label: Text('NAME')),
+                                  DataColumn(label: Text('PHONE')),
+                                  DataColumn(label: Text('EMAIL')),
+                                  DataColumn(label: Text('ADDRESS')),
+                                  DataColumn(label: Text('ACTIONS', textAlign: TextAlign.right)),
                                 ],
+                                rows: provider.suppliers.map((sup) {
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text('#${sup.id}', style: const TextStyle(color: Colors.grey))),
+                                      DataCell(Text(sup.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                      DataCell(Text(sup.phone ?? '-')),
+                                      DataCell(Text(sup.email ?? '-')),
+                                      DataCell(
+                                        SizedBox(
+                                          width: 250,
+                                          child: Text(
+                                            sup.address ?? '-',
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.edit_outlined, size: 18),
+                                              tooltip: 'Edit',
+                                              onPressed: () => _showFormDialog(sup),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade400),
+                                              tooltip: 'Delete',
+                                              onPressed: () => _confirmDelete(sup),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
                               ),
                             ),
             ),

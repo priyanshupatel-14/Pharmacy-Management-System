@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../../core/widgets/page_header.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/widgets/data_table_card.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../providers/sale_provider.dart';
 import '../models/sale.dart';
 import 'new_sale_screen.dart';
@@ -23,7 +27,6 @@ class _SalesScreenState extends State<SalesScreen> {
 
   void _showSaleDetails(Sale sale) async {
     final provider = context.read<SaleProvider>();
-    // Fetch details to get items
     final detailedSale = await provider.fetchSaleDetails(sale.id);
 
     if (!mounted) return;
@@ -36,43 +39,74 @@ class _SalesScreenState extends State<SalesScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Sale Details - #${detailedSale.id}'),
+        title: Text('Sale Receipt #${detailedSale.id}'),
         content: SizedBox(
-          width: 500,
+          width: 600,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Date: ${detailedSale.saleDate}'),
-              Text('Total Amount: ₹${detailedSale.totalAmount.toStringAsFixed(2)}'),
-              if (detailedSale.userName != null) Text('Cashier: ${detailedSale.userName}'),
-              const SizedBox(height: 16),
-              const Text('Items:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              if (detailedSale.items == null || detailedSale.items!.isEmpty)
-                const Text('No items found.')
-              else
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Medicine')),
-                      DataColumn(label: Text('Batch')),
-                      DataColumn(label: Text('Price')),
-                      DataColumn(label: Text('Qty')),
-                      DataColumn(label: Text('Subtotal')),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Date & Time', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(
+                        DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(detailedSale.saleDate)),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ],
-                    rows: detailedSale.items!.map((item) {
-                      return DataRow(cells: [
-                        DataCell(Text(item.medicineName ?? '-')),
-                        DataCell(Text(item.batchNumber ?? '-')),
-                        DataCell(Text('₹${item.unitPrice.toStringAsFixed(2)}')),
-                        DataCell(Text(item.quantity.toString())),
-                        DataCell(Text('₹${item.subtotal.toStringAsFixed(2)}')),
-                      ]);
-                    }).toList(),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('Cashier', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(detailedSale.userName ?? 'System', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text('Items Purchased', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Divider(),
+              if (detailedSale.items == null || detailedSale.items!.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No items found.'),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: detailedSale.items!.length,
+                    separatorBuilder: (_, index) => const Divider(height: 1),
+                    itemBuilder: (ctx, idx) {
+                      final item = detailedSale.items![idx];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(item.medicineName ?? 'Unknown Item', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('Batch: ${item.batchNumber ?? '-'} • ${CurrencyFormatter.format(item.unitPrice)} x ${item.quantity}'),
+                        trailing: Text(
+                          CurrencyFormatter.format(item.subtotal),
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                      );
+                    },
                   ),
                 ),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(
+                    CurrencyFormatter.format(detailedSale.totalAmount),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Theme.of(context).primaryColor),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -88,73 +122,89 @@ class _SalesScreenState extends State<SalesScreen> {
     final provider = context.watch<SaleProvider>();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const NewSaleScreen()),
-          );
-          if (result == true) {
-            provider.fetchSales();
-          }
-        },
-        icon: const Icon(Icons.receipt),
-        label: const Text('New Sale'),
-      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
             PageHeader(
-              title: 'Sales History',
-              subtitle: 'View past sales and generate new bills.',
-              action: IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh Sales',
-                onPressed: () => provider.fetchSales(),
+              title: 'Sales & Billing',
+              subtitle: 'Process new transactions and view sales history',
+              action: FilledButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NewSaleScreen()),
+                  );
+                  if (result == true) {
+                    provider.fetchSales();
+                  }
+                },
+                icon: const Icon(Icons.receipt_long, size: 18),
+                label: const Text('New Sale'),
               ),
             ),
+            
+            // Toolbar
+            Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: () => provider.fetchSales(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
             Expanded(
               child: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const LoadingState(message: 'Loading sales history...')
                   : provider.errorMessage != null
-                      ? Center(
-                          child: Text(
-                            provider.errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 16),
-                          ),
+                      ? ErrorState(
+                          message: provider.errorMessage!,
+                          onRetry: () => provider.fetchSales(),
                         )
                       : provider.sales.isEmpty
-                          ? const Center(child: Text('No sales records found.'))
-                          : Card(
-                              elevation: 2,
-                              child: ListView(
-                                children: [
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: DataTable(
-                                      columns: const [
-                                        DataColumn(label: Text('Sale ID')),
-                                        DataColumn(label: Text('Date')),
-                                        DataColumn(label: Text('Total Amount')),
-                                        DataColumn(label: Text('Actions')),
-                                      ],
-                                      rows: provider.sales.map((sale) {
-                                        return DataRow(cells: [
-                                          DataCell(Text(sale.id.toString())),
-                                          DataCell(Text(sale.saleDate)),
-                                          DataCell(Text('₹${sale.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green))),
-                                          DataCell(
-                                            IconButton(
-                                              icon: const Icon(Icons.visibility, color: Colors.blue),
-                                              tooltip: 'View Details',
-                                              onPressed: () => _showSaleDetails(sale),
-                                            ),
-                                          ),
-                                        ]);
-                                      }).toList(),
-                                    ),
-                                  ),
+                          ? const EmptyState(
+                              title: 'No sales yet',
+                              message: 'Create a new sale to see it listed here.',
+                              icon: Icons.receipt_long_outlined,
+                            )
+                          : DataTableCard(
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('RECEIPT NO')),
+                                  DataColumn(label: Text('DATE & TIME')),
+                                  DataColumn(label: Text('AMOUNT', textAlign: TextAlign.right)),
+                                  DataColumn(label: Text('ACTIONS', textAlign: TextAlign.right)),
                                 ],
+                                rows: provider.sales.map((sale) {
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text('#${sale.id}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                                      DataCell(Text(DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(sale.saleDate)))),
+                                      DataCell(
+                                        Container(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            CurrencyFormatter.format(sale.totalAmount),
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Container(
+                                          alignment: Alignment.centerRight,
+                                          child: IconButton(
+                                            icon: const Icon(Icons.visibility_outlined, size: 18),
+                                            tooltip: 'View Receipt',
+                                            onPressed: () => _showSaleDetails(sale),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
                               ),
                             ),
             ),

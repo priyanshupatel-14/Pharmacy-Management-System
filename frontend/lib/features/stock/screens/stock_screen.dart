@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/widgets/page_header.dart';
+import '../../../core/widgets/ui_states.dart';
+import '../../../core/widgets/data_table_card.dart';
+import '../../../core/widgets/status_badge.dart';
 import '../providers/stock_provider.dart';
 
 class StockScreen extends StatefulWidget {
@@ -25,15 +28,17 @@ class _StockScreenState extends State<StockScreen> {
 
     return Scaffold(
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
             PageHeader(
-              title: 'Current Inventory',
-              subtitle: 'View overall stock levels and identify low-stock items',
+              title: 'Inventory Status',
+              subtitle: 'Monitor stock levels and identify low inventory items',
               action: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Show Low Stock Only'),
+                  const Text('Low Stock Only', style: TextStyle(fontWeight: FontWeight.w500)),
+                  const SizedBox(width: 8),
                   Switch(
                     value: provider.showLowStockOnly,
                     onChanged: (val) => provider.toggleLowStockFilter(val),
@@ -41,67 +46,66 @@ class _StockScreenState extends State<StockScreen> {
                   const SizedBox(width: 16),
                   IconButton(
                     icon: const Icon(Icons.refresh),
-                    tooltip: 'Refresh Stock',
+                    tooltip: 'Refresh',
                     onPressed: () => provider.fetchStock(),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 16),
             Expanded(
               child: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const LoadingState(message: 'Checking inventory levels...')
                   : provider.errorMessage != null
-                      ? Center(
-                          child: Text(
-                            provider.errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 16),
-                          ),
+                      ? ErrorState(
+                          message: provider.errorMessage!,
+                          onRetry: () => provider.fetchStock(),
                         )
                       : provider.stocks.isEmpty
-                          ? const Center(child: Text('No stock data available.'))
-                          : Card(
-                              elevation: 2,
-                              child: ListView(
-                                children: [
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: DataTable(
-                                      columns: const [
-                                        DataColumn(label: Text('Medicine ID')),
-                                        DataColumn(label: Text('Medicine Name')),
-                                        DataColumn(label: Text('Category')),
-                                        DataColumn(label: Text('Total Stock')),
-                                        DataColumn(label: Text('Status')),
-                                      ],
-                                      rows: provider.stocks.map((stock) {
-                                        final isLow = stock.totalStock <= 10;
-                                        return DataRow(cells: [
-                                          DataCell(Text(stock.medicineId.toString())),
-                                          DataCell(Text(stock.medicineName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                          DataCell(Text(stock.category)),
-                                          DataCell(
-                                            Text(
-                                              stock.totalStock.toString(),
-                                              style: TextStyle(
-                                                color: isLow ? Colors.red : Colors.green,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Chip(
-                                              label: Text(
-                                                isLow ? 'Low Stock' : 'In Stock',
-                                                style: const TextStyle(color: Colors.white),
-                                              ),
-                                              backgroundColor: isLow ? Colors.red : Colors.green,
-                                            ),
-                                          ),
-                                        ]);
-                                      }).toList(),
-                                    ),
-                                  ),
+                          ? EmptyState(
+                              title: provider.showLowStockOnly ? 'No low stock' : 'No stock data',
+                              message: provider.showLowStockOnly
+                                  ? 'All your inventory is currently healthy.'
+                                  : 'No stock data is available right now.',
+                              icon: Icons.inventory_2_outlined,
+                            )
+                          : DataTableCard(
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('ID')),
+                                  DataColumn(label: Text('MEDICINE')),
+                                  DataColumn(label: Text('CATEGORY')),
+                                  DataColumn(label: Text('AVAILABLE STOCK', textAlign: TextAlign.right)),
+                                  DataColumn(label: Text('STATUS')),
                                 ],
+                                rows: provider.stocks.map((stock) {
+                                  final isLow = stock.totalStock <= 10;
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text('#${stock.medicineId}', style: const TextStyle(color: Colors.grey))),
+                                      DataCell(Text(stock.medicineName, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                      DataCell(Text(stock.category)),
+                                      DataCell(
+                                        Container(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            stock.totalStock.toString(),
+                                            style: TextStyle(
+                                              color: isLow ? Colors.red.shade700 : Colors.green.shade700,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        StatusBadge(
+                                          label: isLow ? 'Low Stock' : 'Healthy',
+                                          status: isLow ? BadgeStatus.error : BadgeStatus.success,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
                               ),
                             ),
             ),
